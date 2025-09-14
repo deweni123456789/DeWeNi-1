@@ -6,9 +6,9 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
 
 # ---------------- Config ----------------
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+API_ID = int(os.environ.get("5047271"))
+API_HASH = os.environ.get("047d9ed308172e637d4265e1d9ef0c2")
+BOT_TOKEN = os.environ.get("8464050626:AAFjoldNU_A5jHEzSspCDDNUy5__WyEFfms")
 # ---------------------------------------
 
 app = Client("fb_insta_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
