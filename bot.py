@@ -14,7 +14,8 @@ DOWNLOAD_FOLDER = "downloads"
 # ---------------------------------------
 
 # Ensure downloads folder exists
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+if not os.path.exists(DOWNLOAD_FOLDER):
+    os.makedirs(DOWNLOAD_FOLDER)
 
 app = Client("fb_insta_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -36,28 +37,28 @@ async def start_cmd(client, message):
 URL_REGEX = r"(https?://(?:www\.)?(facebook|fb|instagram|insta)\.com/[^\s]+)"
 
 def sanitize_filename(name: str) -> str:
-    """Remove invalid characters and extra spaces."""
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)  # remove illegal chars
+    """Remove illegal filename characters and extra spaces."""
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     return sanitized
 
 def download_media(url, opts):
-    """Download media and return safe file path."""
+    """Download media safely and return info with safe path."""
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
 
-    # Sanitize filename
-    safe_title = sanitize_filename(info['title'])
+    # Generate a safe filename
+    safe_title = sanitize_filename(info.get('title', 'file'))
     ext = info.get('ext', 'mp4')
     safe_file = os.path.join(DOWNLOAD_FOLDER, f"{safe_title}.{ext}")
 
-    # Rename if original file contains unsafe characters
-    original_file = os.path.join(DOWNLOAD_FOLDER, f"{info['title']}.{ext}")
+    # Attempt to rename the file if yt-dlp created unsafe name
+    original_file = os.path.join(DOWNLOAD_FOLDER, f"{info.get('title', 'file')}.{ext}")
     if os.path.exists(original_file) and original_file != safe_file:
         try:
             os.rename(original_file, safe_file)
-        except FileNotFoundError:
-            pass  # fallback to safe_file
+        except Exception:
+            pass  # fallback if rename fails
 
     info['safe_file'] = safe_file
     return info
@@ -95,6 +96,7 @@ async def link_handler(client, message):
 
         await message.reply_document(downloaded_file, caption=caption, reply_markup=buttons)
 
+        # Clean up file
         os.remove(downloaded_file)
 
     except Exception as e:
