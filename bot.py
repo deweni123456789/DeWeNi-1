@@ -31,19 +31,31 @@ async def start_cmd(client, message):
 URL_REGEX = r"(https?://(?:www\.)?(facebook|fb|instagram|insta)\.com/[^\s]+)"
 
 def sanitize_filename(name: str) -> str:
-    """Remove invalid characters for filenames."""
-    return re.sub(r'[\\/:"*?<>|]+', "", name)
+    """
+    Remove all invalid characters for filenames and replace multiple spaces with single space.
+    """
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)  # Remove illegal chars
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()  # Remove extra spaces
+    return sanitized
 
 def download_media(url, opts):
     """Download media and return info with safe file path."""
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
-    # Sanitize filename
+
+    # Sanitize the filename
     safe_title = sanitize_filename(info['title'])
     safe_file = os.path.join("downloads", f"{safe_title}.{info['ext']}")
+
+    # Rename if original file contains unsafe characters
     original_file = os.path.join("downloads", f"{info['title']}.{info['ext']}")
     if original_file != safe_file:
-        os.rename(original_file, safe_file)
+        try:
+            os.rename(original_file, safe_file)
+        except FileNotFoundError:
+            # If the file wasn’t saved correctly, fallback to safe_file name directly
+            safe_file = os.path.join("downloads", f"{safe_title}.{info['ext']}")
+
     info['safe_file'] = safe_file
     return info
 
