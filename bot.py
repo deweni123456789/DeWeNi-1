@@ -30,6 +30,23 @@ async def start_cmd(client, message):
 # ---------------- Link Detection & Download ----------------
 URL_REGEX = r"(https?://(?:www\.)?(facebook|fb|instagram|insta)\.com/[^\s]+)"
 
+def sanitize_filename(name: str) -> str:
+    """Remove invalid characters for filenames."""
+    return re.sub(r'[\\/:"*?<>|]+', "", name)
+
+def download_media(url, opts):
+    """Download media and return info with safe file path."""
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+    # Sanitize filename
+    safe_title = sanitize_filename(info['title'])
+    safe_file = os.path.join("downloads", f"{safe_title}.{info['ext']}")
+    original_file = os.path.join("downloads", f"{info['title']}.{info['ext']}")
+    if original_file != safe_file:
+        os.rename(original_file, safe_file)
+    info['safe_file'] = safe_file
+    return info
+
 @app.on_message(filters.text & filters.private)
 async def link_handler(client, message):
     urls = re.findall(URL_REGEX, message.text)
@@ -51,7 +68,7 @@ async def link_handler(client, message):
         loop = asyncio.get_event_loop()
         info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
 
-        downloaded_file = os.path.join("downloads", f"{info['title']}.{info['ext']}")
+        downloaded_file = info['safe_file']
         duration = int(info.get("duration", 0))
         size_mb = round(os.path.getsize(downloaded_file) / (1024 * 1024), 2)
         metadata = f"🎬 Title: {info['title']}\n⏱ Duration: {duration} sec\n💾 Size: {size_mb} MB"
@@ -61,11 +78,6 @@ async def link_handler(client, message):
 
     except Exception as e:
         await message.reply_text(f"❌ Failed to download.\nError: {e}")
-
-def download_media(url, opts):
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-    return info
 
 # ---------------- Run Bot ----------------
 if __name__ == "__main__":
