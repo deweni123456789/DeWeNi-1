@@ -6,9 +6,9 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
 
 # ---------------- Config ----------------
-API_ID = int(os.environ.get("5047271"))
-API_HASH = os.environ.get("047d9ed308172e637d4265e1d9ef0c2")
-BOT_TOKEN = os.environ.get("8464050626:AAFjoldNU_A5jHEzSspCDDNUy5__WyEFfms")
+API_ID = 5047271
+API_HASH = "047d9ed308172e637d4265e1d9ef0c27"
+BOT_TOKEN = "8464050626:AAFjoldNU_A5jHEzSspCDDNUy5__WyEFfms"
 # ---------------------------------------
 
 app = Client("fb_insta_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -19,15 +19,15 @@ buttons = InlineKeyboardMarkup([
     [InlineKeyboardButton("Support Group", url="https://t.me/slmusicmania")]
 ])
 
-# Start command
-@app.on_message(filters.command(["start"]) & filters.private)
+# ---------------- Start Command ----------------
+@app.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
     await message.reply_text(
         "Hi! Send me a Facebook or Instagram link and I will download the video/photo for you.",
         reply_markup=buttons
     )
 
-# Regex to detect FB or IG links
+# ---------------- Link Detection & Download ----------------
 URL_REGEX = r"(https?://(?:www\.)?(facebook|fb|instagram|insta)\.com/[^\s]+)"
 
 @app.on_message(filters.text & filters.private)
@@ -40,7 +40,6 @@ async def link_handler(client, message):
     url = urls[0][0]
     await message.reply_text("⏳ Downloading your video/photo...")
 
-    # Setup yt-dlp
     ydl_opts = {
         "format": "best",
         "outtmpl": "downloads/%(title)s.%(ext)s",
@@ -49,7 +48,26 @@ async def link_handler(client, message):
 
     try:
         os.makedirs("downloads", exist_ok=True)
-
-        # Extract info & download
         loop = asyncio.get_event_loop()
-        info = await loop.run_in_executor(None, lambda: download_media(url,_
+        info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
+
+        downloaded_file = os.path.join("downloads", f"{info['title']}.{info['ext']}")
+        duration = int(info.get("duration", 0))
+        size_mb = round(os.path.getsize(downloaded_file) / (1024 * 1024), 2)
+        metadata = f"🎬 Title: {info['title']}\n⏱ Duration: {duration} sec\n💾 Size: {size_mb} MB"
+
+        await message.reply_document(downloaded_file, caption=f"{metadata}\n✅ Download completed!", reply_markup=buttons)
+        os.remove(downloaded_file)
+
+    except Exception as e:
+        await message.reply_text(f"❌ Failed to download.\nError: {e}")
+
+def download_media(url, opts):
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+    return info
+
+# ---------------- Run Bot ----------------
+if __name__ == "__main__":
+    print("Bot is starting...")
+    app.run()
