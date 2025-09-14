@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+from datetime import datetime
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
@@ -23,7 +24,7 @@ buttons = InlineKeyboardMarkup([
 @app.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
     await message.reply_text(
-        "Hi! Send me a Facebook or Instagram link and I will download the video/photo for you.",
+        "Hi! Send me a Facebook or Instagram link and I will download it for you.",
         reply_markup=buttons
     )
 
@@ -31,11 +32,8 @@ async def start_cmd(client, message):
 URL_REGEX = r"(https?://(?:www\.)?(facebook|fb|instagram|insta)\.com/[^\s]+)"
 
 def sanitize_filename(name: str) -> str:
-    """
-    Remove all invalid characters for filenames and replace multiple spaces with single space.
-    """
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)  # Remove illegal chars
-    sanitized = re.sub(r'\s+', ' ', sanitized).strip()  # Remove extra spaces
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)
+    sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     return sanitized
 
 def download_media(url, opts):
@@ -46,14 +44,11 @@ def download_media(url, opts):
     # Sanitize the filename
     safe_title = sanitize_filename(info['title'])
     safe_file = os.path.join("downloads", f"{safe_title}.{info['ext']}")
-
-    # Rename if original file contains unsafe characters
     original_file = os.path.join("downloads", f"{info['title']}.{info['ext']}")
     if original_file != safe_file:
         try:
             os.rename(original_file, safe_file)
         except FileNotFoundError:
-            # If the file wasn’t saved correctly, fallback to safe_file name directly
             safe_file = os.path.join("downloads", f"{safe_title}.{info['ext']}")
 
     info['safe_file'] = safe_file
@@ -81,11 +76,13 @@ async def link_handler(client, message):
         info = await loop.run_in_executor(None, lambda: download_media(url, ydl_opts))
 
         downloaded_file = info['safe_file']
-        duration = int(info.get("duration", 0))
         size_mb = round(os.path.getsize(downloaded_file) / (1024 * 1024), 2)
-        metadata = f"🎬 Title: {info['title']}\n⏱ Duration: {duration} sec\n💾 Size: {size_mb} MB"
+        uploaded_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        requester = message.from_user.mention
 
-        await message.reply_document(downloaded_file, caption=f"{metadata}\n✅ Download completed!", reply_markup=buttons)
+        caption = f"💾 Size: {size_mb} MB\n🕒 Uploaded: {uploaded_time}\n👤 Requested by: {requester}"
+
+        await message.reply_document(downloaded_file, caption=caption, reply_markup=buttons)
         os.remove(downloaded_file)
 
     except Exception as e:
