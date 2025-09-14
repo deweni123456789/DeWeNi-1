@@ -11,11 +11,11 @@ API_ID = 5047271
 API_HASH = "047d9ed308172e637d4265e1d9ef0c27"
 BOT_TOKEN = "8464050626:AAFjoldNU_A5jHEzSspCDDNUy5__WyEFfms"
 DOWNLOAD_FOLDER = "downloads"
+COOKIES_FILE = "cookies.txt"  # Place your exported cookies here
 # ---------------------------------------
 
 # Ensure downloads folder exists
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 app = Client("fb_insta_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -43,22 +43,22 @@ def sanitize_filename(name: str) -> str:
     return sanitized
 
 def download_media(url, opts):
-    """Download media safely and return info with safe path."""
+    """Download media safely with cookies and return info with safe path."""
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
 
-    # Generate a safe filename
+    # Sanitize filename
     safe_title = sanitize_filename(info.get('title', 'file'))
     ext = info.get('ext', 'mp4')
     safe_file = os.path.join(DOWNLOAD_FOLDER, f"{safe_title}.{ext}")
 
-    # Attempt to rename the file if yt-dlp created unsafe name
+    # Rename if original file contains unsafe characters
     original_file = os.path.join(DOWNLOAD_FOLDER, f"{info.get('title', 'file')}.{ext}")
     if os.path.exists(original_file) and original_file != safe_file:
         try:
             os.rename(original_file, safe_file)
         except Exception:
-            pass  # fallback if rename fails
+            pass  # fallback
 
     info['safe_file'] = safe_file
     return info
@@ -78,6 +78,7 @@ async def link_handler(client, message):
         "format": "best",
         "outtmpl": os.path.join(DOWNLOAD_FOLDER, "%(title)s.%(ext)s"),
         "noplaylist": True,
+        "cookiefile": COOKIES_FILE,  # Use cookies for private/restricted videos
     }
 
     try:
@@ -96,7 +97,7 @@ async def link_handler(client, message):
 
         await message.reply_document(downloaded_file, caption=caption, reply_markup=buttons)
 
-        # Clean up file
+        # Clean up downloaded file
         os.remove(downloaded_file)
 
     except Exception as e:
